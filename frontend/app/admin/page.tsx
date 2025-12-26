@@ -55,9 +55,12 @@ export default function AdminPage() {
       setLoading(true);
       setError(null);
       const response = await adminAPI.getPreparedPhases();
-      setPreparedPhases(response.phases);
+      // response.phases가 undefined일 수 있으므로 기본값 설정
+      setPreparedPhases(response.phases || []);
     } catch (err: any) {
+      console.error('Prepared Phase 로드 에러:', err);
       setError(err.response?.data?.error || 'Prepared Phase 목록을 불러올 수 없습니다.');
+      setPreparedPhases([]); // 에러 발생 시 빈 배열로 설정
     } finally {
       setLoading(false);
     }
@@ -105,12 +108,21 @@ export default function AdminPage() {
       
       // 목록 새로고침
       if (activeTab === 'list') {
-        loadPhases();
+        await loadPhases(); // 승인 상태가 반영되도록 새로고침
       } else if (activeTab === 'prepared') {
-        loadPreparedPhases();
+        await loadPreparedPhases();
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Phase 승인에 실패했습니다.');
+      console.error('Phase 승인 에러:', err);
+      const errorMessage = err.response?.data?.error || 'Phase 승인에 실패했습니다.';
+      setError(errorMessage);
+      
+      // 이미 승인된 경우에도 목록 새로고침
+      if (err.response?.status === 409) {
+        if (activeTab === 'list') {
+          await loadPhases();
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -290,10 +302,12 @@ export default function AdminPage() {
                               <span className={`px-2 py-1 text-xs font-medium rounded ${
                                 phase.status === 'active' ? 'bg-green-100 text-green-800' :
                                 phase.status === 'solved' ? 'bg-blue-100 text-blue-800' :
+                                phase.isApproved ? 'bg-purple-100 text-purple-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {phase.status === 'active' ? '활성' :
-                                 phase.status === 'solved' ? '해결됨' : '초안'}
+                                 phase.status === 'solved' ? '해결됨' :
+                                 phase.isApproved ? '승인됨' : '대기중'}
                               </span>
                             </div>
                             <p className="text-gray-700 mb-2">{phase.hintText}</p>
@@ -306,20 +320,30 @@ export default function AdminPage() {
                             <p className="text-xs text-blue-600 mt-2 hover:underline">상세 정보 보기 →</p>
                           </div>
                           <div className="flex gap-2 ml-4">
-                            {phase.status === 'draft' && (
+                            {/* 승인 버튼: active나 solved가 아니고, 아직 승인되지 않은 Phase에만 표시 */}
+                            {phase.status !== 'active' && phase.status !== 'solved' && !phase.isApproved && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApprovePhase(phase.id); }}
                                 disabled={loading}
                                 className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+                                title="이 Phase를 승인하여 게임에 사용할 수 있도록 합니다"
                               >
                                 승인
                               </button>
                             )}
+                            {/* 이미 승인된 경우 표시 */}
+                            {phase.isApproved && (
+                              <span className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded">
+                                승인됨
+                              </span>
+                            )}
+                            {/* 삭제 버튼: active가 아닌 Phase에만 표시 */}
                             {phase.status !== 'active' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDeletePhase(phase.id); }}
                                 disabled={loading}
                                 className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400"
+                                title="이 Phase를 삭제합니다"
                               >
                                 삭제
                               </button>
@@ -365,7 +389,7 @@ export default function AdminPage() {
                 </div>
                 {loading ? (
                   <div className="p-6 text-center text-gray-500">로딩 중...</div>
-                ) : preparedPhases.length === 0 ? (
+                ) : !preparedPhases || preparedPhases.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">승인된 Phase가 없습니다.</div>
                 ) : (
                   <div className="divide-y divide-gray-200">
@@ -378,12 +402,16 @@ export default function AdminPage() {
                           </span>
                         </div>
                         <p className="text-gray-700 mb-2">{phase.hintText}</p>
-                        <p className="text-sm text-gray-500">
-                          좌표: ({phase.lat.toFixed(6)}, {phase.lng.toFixed(6)})
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          생성일: {new Date(phase.createdAt).toLocaleString('ko-KR')}
-                        </p>
+                        {phase.lat !== undefined && phase.lng !== undefined && (
+                          <p className="text-sm text-gray-500">
+                            좌표: ({Number(phase.lat).toFixed(6)}, {Number(phase.lng).toFixed(6)})
+                          </p>
+                        )}
+                        {phase.createdAt && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            생성일: {new Date(phase.createdAt).toLocaleString('ko-KR')}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>

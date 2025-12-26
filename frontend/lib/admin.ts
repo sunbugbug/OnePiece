@@ -6,9 +6,10 @@ export interface Phase {
   lat: number;
   lng: number;
   streetViewId?: string;
-  status: 'draft' | 'active' | 'solved';
+  status: 'prepared' | 'active' | 'solved';
   createdAt: string;
   updatedAt: string;
+  isApproved?: boolean; // 이미 승인되었는지 여부 (선택적)
 }
 
 export interface CreatePhaseRequest {
@@ -90,7 +91,20 @@ export const adminAPI = {
   // Prepared Phase 목록 조회
   getPreparedPhases: async (): Promise<PhaseListResponse> => {
     const response = await apiClient.get('/phase/admin/prepared');
-    return response.data;
+    // 백엔드 응답 구조에 맞게 변환: preparedPhases 배열에서 phase 객체 추출
+    const phases = response.data.preparedPhases
+      ? response.data.preparedPhases
+          .filter((pp: any) => pp.phase !== null)
+          .map((pp: any) => pp.phase)
+      : [];
+    return {
+      phases,
+      pagination: {
+        page: 1,
+        limit: phases.length,
+        totalPages: 1,
+      },
+    };
   },
 
   // 전체 Phase 목록 조회

@@ -29,7 +29,12 @@ export default function HomePage() {
       setPhaseLoading(true);
       setError(null);
       const currentPhase = await getCurrentPhase();
-      setPhase(currentPhase);
+      if (currentPhase) {
+        setPhase(currentPhase);
+      } else {
+        setPhase(null);
+        setError('현재 활성화된 Phase가 없습니다. Admin이 Phase를 생성해주세요.');
+      }
     } catch (err: any) {
       console.error('Error loading phase:', err);
       setError(err.response?.data?.error || 'Phase를 불러올 수 없습니다.');

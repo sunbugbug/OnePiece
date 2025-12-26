@@ -39,6 +39,24 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
     let initTimeout: NodeJS.Timeout | null = null;
     let rafId: number | null = null;
 
+    // Google Maps API 전역 오류 핸들러 설정
+    const originalErrorHandler = window.onerror;
+    const googleMapsErrorHandler = (event: ErrorEvent) => {
+      if (event.message && (
+        event.message.includes('ApiProjectMapError') ||
+        event.message.includes('NoApiKeys') ||
+        event.message.includes('Google Maps JavaScript API error')
+      )) {
+        console.error('[GameMap] Google Maps API 오류 감지:', event.message);
+        if (isComponentMounted) {
+          setError('Google Maps JavaScript API 오류가 발생했습니다. 콘솔을 확인하세요.');
+          setLoading(false);
+        }
+      }
+    };
+    
+    window.addEventListener('error', googleMapsErrorHandler);
+
     const initMap = async () => {
       console.log('[GameMap] 초기화 시작');
       
@@ -97,9 +115,6 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
         return;
       }
 
-      // setOptions를 먼저 호출하여 NoApiKeys 경고 방지
-      initializeGoogleMaps(apiKey);
-
       try {
         // 3. API 초기화 (전역으로 한 번만 실행 - window 객체에 저장하여 HMR 리셋 방지)
         const isApiInitialized = typeof window !== 'undefined' ? (window as any).__googleMapsApiInitialized : false;
@@ -112,6 +127,13 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
             (window as any).__googleMapsApiInitializing = true;
             (window as any).__googleMapsApiKey = apiKey;
           }
+          
+          // setOptions를 importLibrary 직전에 호출 (매우 중요!)
+          console.log('[GameMap] setOptions 호출 중...');
+          initializeGoogleMaps(apiKey);
+          
+          // setOptions가 완전히 적용되도록 짧은 대기
+          await new Promise(resolve => setTimeout(resolve, 100));
           
           // Maps 라이브러리 로드
           console.log('[GameMap] importLibrary("maps") 호출 중...');
@@ -133,8 +155,19 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
           }
           console.log('[GameMap] API 초기화 완료 (다른 컴포넌트에서)');
         } else if (savedApiKey !== apiKey) {
-          // API 키가 변경된 경우 경고
-          console.warn('[GameMap] API 키가 변경되었습니다. 페이지를 새로고침하세요.');
+          // API 키가 변경된 경우 경고 및 재초기화
+          console.warn('[GameMap] API 키가 변경되었습니다. 재초기화 중...');
+          if (typeof window !== 'undefined') {
+            (window as any).__googleMapsApiInitialized = false;
+            (window as any).__googleMapsApiKey = apiKey;
+          }
+          // setOptions 재호출
+          initializeGoogleMaps(apiKey);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await importLibrary('maps');
+          if (typeof window !== 'undefined') {
+            (window as any).__googleMapsApiInitialized = true;
+          }
         } else {
           console.log('[GameMap] API가 이미 초기화되었습니다.');
         }
@@ -250,17 +283,21 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
           let errorMessage = err.message || '지도를 불러올 수 없습니다.';
           
           // ApiProjectMapError에 대한 상세 안내
-          if (err.message && err.message.includes('ApiProjectMapError')) {
-            errorMessage = 'Google Maps API 키 설정 오류입니다.\n\n' +
-              '가능한 원인:\n' +
-              '1. Maps JavaScript API가 Google Cloud Console에서 활성화되지 않았습니다.\n' +
-              '2. API 키에 HTTP 리퍼러 제한이 설정되어 있고 현재 도메인이 허용되지 않았습니다.\n' +
-              '3. 결제 계정이 설정되지 않았습니다.\n' +
-              '4. API 키가 잘못되었거나 만료되었습니다.\n\n' +
-              '해결 방법:\n' +
-              '- Google Cloud Console에서 Maps JavaScript API 활성화 확인\n' +
-              '- API 키 제한 설정에서 localhost 또는 현재 도메인 허용\n' +
-              '- 결제 계정 설정 확인';
+          if (err.message && (err.message.includes('ApiProjectMapError') || err.message.includes('NoApiKeys'))) {
+            errorMessage = 'Google Maps JavaScript API 오류가 발생했습니다.\n\n' +
+              '🔍 가능한 원인:\n' +
+              '1. Maps JavaScript API가 Google Cloud Console에서 활성화되지 않았습니다 ⚠️\n' +
+              '2. API 키에 HTTP 리퍼러 제한이 설정되어 있고 현재 도메인(localhost:3000)이 허용되지 않았습니다\n' +
+              '3. 결제 계정이 "활성" 상태가 아닙니다 (가장 흔한 원인) ⚠️\n' +
+              '4. API 키가 잘못되었거나 다른 프로젝트의 키를 사용하고 있습니다\n\n' +
+              '✅ 해결 방법:\n' +
+              '1. Google Cloud Console > "API 및 서비스" > "사용 설정된 API 및 서비스"에서 "Maps JavaScript API" 활성화 확인\n' +
+              '2. "사용자 인증 정보" > API 키 > "HTTP 리퍼러(웹사이트)" 제한에서 "localhost:3000/*" 추가\n' +
+              '3. "결제" > "결제 수단"에서 결제 수단이 "활성" 상태인지 확인 (중요!)\n' +
+              '4. API 키가 올바른 프로젝트에서 생성되었는지 확인\n' +
+              '5. 설정 변경 후 5-10분 대기 후 하드 리프레시 (Ctrl+Shift+R)\n\n' +
+              '💡 참고: Geocoding API와 Street View Static API는 작동하지만 Maps JavaScript API만 오류가 나는 경우,\n' +
+              '   Maps JavaScript API 활성화 또는 결제 계정 상태를 확인하세요.';
           }
           
           setError(errorMessage);
@@ -280,6 +317,7 @@ export default function GameMap({ onLocationSelect, selectedLocation }: GameMapP
     // Cleanup 함수
     return () => {
       isComponentMounted = false;
+      window.removeEventListener('error', googleMapsErrorHandler);
       if (initTimeout) {
         clearTimeout(initTimeout);
       }

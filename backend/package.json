@@ -9,6 +9,7 @@
     "migrate": "ts-node src/utils/migrate.ts",
     "create-admin": "ts-node src/utils/createAdmin.ts",
     "list-admins": "ts-node src/utils/listAdmins.ts",
+    "list-users": "ts-node src/utils/listUsers.ts",
     "create-phase": "ts-node src/utils/createActivePhase.ts",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -16,18 +16,25 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     setError('');
     setLoading(true);
 
-    const result = await login(email, password, rememberMe);
+    try {
+      const result = await login(email, password, rememberMe);
 
-    if (result.success) {
-      router.push('/');
-    } else {
-      setError(result.error || 'Login failed');
+      if (result && result.success) {
+        router.push('/');
+      } else {
+        setError(result?.error || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -37,11 +44,21 @@ export default function LoginPage() {
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+            <p className="font-semibold">로그인 실패</p>
+            <p>{error}</p>
+            {error.includes('Invalid email or password') && (
+              <p className="mt-2 text-sm">
+                계정이 없으신가요?{' '}
+                <Link href="/signup" className="text-blue-600 hover:underline font-semibold">
+                  회원가입
+                </Link>
+                을 먼저 진행해주세요.
+              </p>
+            )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               이메일

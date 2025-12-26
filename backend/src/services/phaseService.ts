@@ -118,20 +118,38 @@ export async function activatePhase(phaseId: string): Promise<Phase> {
 }
 
 /**
- * Prepared Phase를 Active로 전환
+ * Prepared Phase를 Active로 전환 (랜덤 선택)
  */
 export async function activatePreparedPhase(): Promise<Phase | null> {
-  // 가장 오래된 Prepared Phase 찾기
-  const preparedPhase = await preparedPhaseRepository.findOne({
+  // 모든 Prepared Phase 가져오기
+  const preparedPhases = await preparedPhaseRepository.find({
     relations: ['phase'],
-    order: { approvedAt: 'ASC' },
   });
 
-  if (!preparedPhase || !preparedPhase.phase) {
+  // Phase가 있고 status가 PREPARED인 것만 필터링
+  const validPreparedPhases = preparedPhases.filter(
+    (pp) => pp.phase && pp.phase.status === PhaseStatus.PREPARED
+  );
+
+  if (validPreparedPhases.length === 0) {
     return null;
   }
 
-  return activatePhase(preparedPhase.phase.id);
+  // 랜덤으로 하나 선택
+  const randomIndex = Math.floor(Math.random() * validPreparedPhases.length);
+  const selectedPreparedPhase = validPreparedPhases[randomIndex];
+
+  if (!selectedPreparedPhase || !selectedPreparedPhase.phase) {
+    return null;
+  }
+
+  // Phase를 Active로 활성화
+  const activatedPhase = await activatePhase(selectedPreparedPhase.phase.id);
+  
+  // PreparedPhase 레코드는 그대로 유지 (승인 기록 보존)
+  // Phase의 status만 ACTIVE로 변경되므로 PreparedPhase는 자동으로 필터링됨
+
+  return activatedPhase;
 }
 
 /**

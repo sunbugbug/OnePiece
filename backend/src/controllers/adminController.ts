@@ -114,10 +114,18 @@ export async function adminGetAllPhases(req: Request, res: Response): Promise<vo
       skip,
       take: Number(limit),
       order: { createdAt: 'DESC' },
+      relations: ['preparedPhase'],
+    });
+
+    // 각 Phase에 승인 여부 정보 추가
+    const phasesWithApproval = phases.map((phase) => {
+      const phaseObj = phase as any;
+      phaseObj.isApproved = !!phase.preparedPhase;
+      return phaseObj;
     });
 
     res.json({
-      phases,
+      phases: phasesWithApproval,
       pagination: {
         page: Number(page),
         limit: Number(limit),

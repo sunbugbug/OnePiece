@@ -130,11 +130,8 @@ export async function login(req: Request, res: Response): Promise<void> {
     };
 
     // rememberMe에 따라 Refresh Token 만료 시간 조정
-    if (rememberMe) {
-      process.env.JWT_REFRESH_EXPIRES_IN = '30d';
-    }
-
-    const { accessToken, refreshToken } = generateTokenPair(tokenPayload);
+    const refreshExpiresIn = rememberMe ? '30d' : undefined;
+    const { accessToken, refreshToken } = generateTokenPair(tokenPayload, refreshExpiresIn);
 
     res.json({
       token: accessToken,

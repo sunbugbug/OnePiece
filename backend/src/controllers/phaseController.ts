@@ -16,14 +16,29 @@ const phaseRepository = AppDataSource.getRepository(Phase);
 
 /**
  * 현재 Active Phase 조회 (사용자용 - 힌트만 반환)
+ * Active Phase가 없으면 자동으로 활성화 시도
  */
 export async function getCurrentPhase(req: Request, res: Response): Promise<void> {
   try {
-    const phase = await getActivePhase();
+    let phase = await getActivePhase();
 
+    // Active Phase가 없으면 자동으로 활성화 시도
     if (!phase) {
-      res.status(404).json({ error: 'No active phase found' });
-      return;
+      console.log('[getCurrentPhase] Active Phase가 없습니다. 자동 활성화 시도...');
+      
+      // Prepared Phase 중에서 랜덤으로 하나 선택해서 활성화
+      const { activatePreparedPhase, activateNextPhase } = await import('../services/phaseService');
+      const activatedPhase = await activatePreparedPhase();
+      
+      if (activatedPhase) {
+        console.log('[getCurrentPhase] ✅ Prepared Phase를 활성화했습니다:', activatedPhase.id);
+        phase = activatedPhase;
+      } else {
+        // Prepared Phase가 없으면 새로 생성해서 활성화
+        console.log('[getCurrentPhase] Prepared Phase가 없습니다. 새 Phase 생성 중...');
+        phase = await activateNextPhase();
+        console.log('[getCurrentPhase] ✅ 새 Phase를 생성하고 활성화했습니다:', phase.id);
+      }
     }
 
     // 사용자에게는 힌트만 제공 (좌표, 이미지 제외)
@@ -283,7 +298,12 @@ export async function adminGetPreparedPhases(req: Request, res: Response): Promi
           ? {
               id: pp.phase.id,
               hintText: pp.phase.hintText,
+              lat: pp.phase.lat,
+              lng: pp.phase.lng,
+              streetViewId: pp.phase.streetViewId,
               status: pp.phase.status,
+              createdAt: pp.phase.createdAt,
+              updatedAt: pp.phase.updatedAt,
             }
           : null,
       })),

@@ -21,9 +21,18 @@ export interface SubmissionResult {
 /**
  * 현재 Active Phase 조회
  */
-export async function getCurrentPhase(): Promise<Phase> {
-  const response = await apiClient.get('/phase/current');
-  return response.data.phase;
+export async function getCurrentPhase(): Promise<Phase | null> {
+  try {
+    const response = await apiClient.get('/phase/current');
+    return response.data.phase || null;
+  } catch (error: any) {
+    // 404 에러는 Active Phase가 없다는 의미이므로 null 반환
+    if (error.response?.status === 404) {
+      return null;
+    }
+    // 다른 에러는 다시 throw
+    throw error;
+  }
 }
 
 /**

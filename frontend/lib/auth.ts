@@ -34,8 +34,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // 401 에러이고 아직 재시도하지 않은 경우
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 로그인/회원가입 요청은 토큰 갱신 로직을 건너뜀
+    const isAuthRequest = originalRequest?.url?.includes('/auth/login') || 
+                          originalRequest?.url?.includes('/auth/signup') ||
+                          originalRequest?.url?.includes('/auth/refresh');
+
+    // 401 에러이고 아직 재시도하지 않은 경우 (인증이 필요한 요청만)
+    if (!isAuthRequest && error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {

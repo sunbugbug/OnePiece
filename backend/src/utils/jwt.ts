@@ -27,19 +27,20 @@ export function generateAccessToken(payload: TokenPayload): string {
 /**
  * Refresh Token 생성
  */
-export function generateRefreshToken(payload: TokenPayload): string {
+export function generateRefreshToken(payload: TokenPayload, expiresIn?: string): string {
+  const refreshExpiresIn = expiresIn || JWT_REFRESH_EXPIRES_IN;
   return jwt.sign(payload as object, JWT_SECRET, {
-    expiresIn: JWT_REFRESH_EXPIRES_IN,
+    expiresIn: refreshExpiresIn,
   } as SignOptions);
 }
 
 /**
  * 토큰 쌍 생성 (Access + Refresh)
  */
-export function generateTokenPair(payload: TokenPayload): TokenPair {
+export function generateTokenPair(payload: TokenPayload, refreshExpiresIn?: string): TokenPair {
   return {
     accessToken: generateAccessToken(payload),
-    refreshToken: generateRefreshToken(payload),
+    refreshToken: generateRefreshToken(payload, refreshExpiresIn),
   };
 }
 
