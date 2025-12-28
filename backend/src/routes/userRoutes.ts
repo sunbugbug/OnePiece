@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getProfile, updateProfile, getStats } from '../controllers/userController';
+import { getProfile, updateProfile, getStats, getSolvedPhases } from '../controllers/userController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -10,6 +10,7 @@ router.use(authenticateToken);
 router.get('/profile', getProfile);
 router.patch('/profile', updateProfile);
 router.get('/stats', getStats);
+router.get('/solved-phases', getSolvedPhases);
 
 export default router;
 

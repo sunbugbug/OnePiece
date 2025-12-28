@@ -6,6 +6,8 @@ import {
   adminPreviewPhase,
   adminApprovePhase,
   adminGetPreparedPhases,
+  getPhaseHistory,
+  getPhaseRanking,
 } from '../controllers/phaseController';
 import {
   adminGeneratePhaseWithHint,
@@ -20,6 +22,8 @@ const router = Router();
 // Public routes
 router.get('/current', getCurrentPhase);
 router.post('/submit', authenticateToken, submitPhase);
+router.get('/history', authenticateToken, getPhaseHistory);
+router.get('/ranking', authenticateToken, getPhaseRanking);
 
 // Admin routes
 router.post('/admin/create', authenticateToken, requireAdmin, adminCreatePhase);

@@ -88,6 +88,18 @@ export default function HomePage() {
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <h1 className="text-lg sm:text-xl font-bold text-blue-600">OnePiece</h1>
                 <Link
+                  href="/phase-history"
+                  className="hidden sm:block text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Phase History
+                </Link>
+                <Link
+                  href="/ranking"
+                  className="hidden sm:block text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  랭킹
+                </Link>
+                <Link
                   href="/profile"
                   className="hidden sm:block text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >

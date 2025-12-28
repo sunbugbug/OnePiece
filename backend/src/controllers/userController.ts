@@ -124,4 +124,56 @@ export async function getStats(req: Request, res: Response): Promise<void> {
   }
 }
 
+/**
+ * 사용자가 맞춘 Phase 목록 조회
+ */
+export async function getSolvedPhases(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const { page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+
+    // History에서 사용자가 winner인 Phase 조회
+    const [histories, total] = await historyRepository.findAndCount({
+      where: { winnerId: userId },
+      relations: ['phase'],
+      order: { solvedAt: 'DESC' },
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+    });
+
+    const { getStreetViewImageUrl } = await import('../services/streetViewService');
+
+    res.json({
+      phases: histories.map((history) => ({
+        id: history.phase.id,
+        hintText: history.phase.hintText,
+        lat: history.phase.lat,
+        lng: history.phase.lng,
+        streetViewId: history.phase.streetViewId,
+        status: history.phase.status,
+        solvedAt: history.solvedAt,
+        submittedLat: history.submittedLat,
+        submittedLng: history.submittedLng,
+        streetViewUrl: getStreetViewImageUrl(history.phase.lat, history.phase.lng),
+      })),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('Get solved phases error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 

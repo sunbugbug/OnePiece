@@ -3,6 +3,8 @@ import { AppDataSource } from '../config/database';
 import { Phase, PhaseStatus } from '../models/Phase';
 import { PreparedPhase } from '../models/PreparedPhase';
 import { HintVersion } from '../models/HintVersion';
+import { History } from '../models/History';
+import { User } from '../models/User';
 import {
   getActivePhase,
   createPhase,
@@ -310,6 +312,117 @@ export async function adminGetPreparedPhases(req: Request, res: Response): Promi
     });
   } catch (error) {
     console.error('Admin get prepared phases error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * Phase History 조회 (모든 Phase 목록 - solved 포함)
+ */
+export async function getPhaseHistory(req: Request, res: Response): Promise<void> {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+
+    // History에서 winner 정보도 함께 가져오기 위해 조인
+    const historyRepository = AppDataSource.getRepository(History);
+    
+    const [phases, total] = await phaseRepository.findAndCount({
+      where: [
+        { status: PhaseStatus.SOLVED },
+        { status: PhaseStatus.ACTIVE },
+      ],
+      relations: ['histories', 'histories.winner'],
+      order: { createdAt: 'DESC' },
+      skip: (pageNum - 1) * limitNum,
+      take: limitNum,
+    });
+
+    // 각 Phase에 대한 제출 정보 가져오기
+    const phasesWithSubmissions = await Promise.all(
+      phases.map(async (phase) => {
+        // History에서 이 Phase를 해결한 사용자의 제출 정보 가져오기
+        const history = await historyRepository.findOne({
+          where: { phaseId: phase.id },
+          order: { solvedAt: 'ASC' }, // 첫 번째 해결자
+        });
+
+        return {
+          id: phase.id,
+          hintText: phase.hintText,
+          lat: phase.lat,
+          lng: phase.lng,
+          streetViewId: phase.streetViewId,
+          status: phase.status,
+          createdAt: phase.createdAt,
+          solvedAt: phase.solvedAt,
+          streetViewUrl: getStreetViewImageUrl(phase.lat, phase.lng),
+          submittedLat: history?.submittedLat,
+          submittedLng: history?.submittedLng,
+        };
+      })
+    );
+
+    res.json({
+      phases: phasesWithSubmissions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('Get phase history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * Phase 랭킹 조회 (가장 많이 맞춘 사용자)
+ */
+export async function getPhaseRanking(req: Request, res: Response): Promise<void> {
+  try {
+    const historyRepository = AppDataSource.getRepository(History);
+    const userRepository = AppDataSource.getRepository(User);
+
+    // History에서 winnerId별로 그룹화하여 정답 횟수 계산
+    const ranking = await historyRepository
+      .createQueryBuilder('history')
+      .select('history.winnerId', 'userId')
+      .addSelect('history.winnerName', 'nickname')
+      .addSelect('COUNT(history.id)', 'correctCount')
+      .addSelect('MAX(history.solvedAt)', 'lastSolvedAt')
+      .groupBy('history.winnerId')
+      .addGroupBy('history.winnerName')
+      .orderBy('correctCount', 'DESC')
+      .addOrderBy('lastSolvedAt', 'DESC')
+      .limit(100)
+      .getRawMany();
+
+    // 사용자 정보 조회
+    const userIds = ranking.map((r) => r.userId).filter((id) => id);
+    const users = await userRepository.find({
+      where: userIds.map((id) => ({ id })),
+      select: ['id', 'nickname', 'email'],
+    });
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    const rankingWithUsers = ranking.map((r, index) => ({
+      rank: index + 1,
+      userId: r.userId,
+      nickname: userMap.get(r.userId)?.nickname || r.nickname || 'Unknown',
+      correctCount: parseInt(r.correctCount, 10),
+      lastSolvedAt: r.lastSolvedAt,
+    }));
+
+    res.json({
+      ranking: rankingWithUsers,
+    });
+  } catch (error) {
+    console.error('Get phase ranking error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }

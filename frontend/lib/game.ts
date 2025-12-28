@@ -5,6 +5,13 @@ export interface Phase {
   hintText: string;
   status: string;
   createdAt: string;
+  lat?: number;
+  lng?: number;
+  streetViewId?: string;
+  streetViewUrl?: string;
+  solvedAt?: string;
+  submittedLat?: number;
+  submittedLng?: number;
 }
 
 export interface SubmissionResult {
@@ -48,6 +55,60 @@ export async function submitLocation(
     lat,
     lng,
   });
+  return response.data;
+}
+
+/**
+ * Phase History 조회
+ */
+export async function getPhaseHistory(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<{
+  phases: Phase[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const response = await apiClient.get('/phase/history', { params });
+  return response.data;
+}
+
+/**
+ * Phase 랭킹 조회
+ */
+export async function getPhaseRanking(): Promise<{
+  ranking: Array<{
+    rank: number;
+    userId: string;
+    nickname: string;
+    correctCount: number;
+    lastSolvedAt: string;
+  }>;
+}> {
+  const response = await apiClient.get('/phase/ranking');
+  return response.data;
+}
+
+/**
+ * 사용자가 맞춘 Phase 목록 조회
+ */
+export async function getSolvedPhases(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<{
+  phases: Phase[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}> {
+  const response = await apiClient.get('/user/solved-phases', { params });
   return response.data;
 }
 
