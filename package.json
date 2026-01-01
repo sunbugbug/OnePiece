@@ -10,7 +10,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
-    "build": "npm run build:frontend",
+    "build": "echo 'This build script is ignored by Vercel. See vercel.json for actual build configuration.'",
     "generate:jwt-secret": "node scripts/generate-jwt-secret.js"
   },
   "keywords": [],
