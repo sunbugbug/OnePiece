@@ -102,6 +102,7 @@ export const adminAPI = {
       pagination: {
         page: 1,
         limit: phases.length,
+        total: phases.length,
         totalPages: 1,
       },
     };

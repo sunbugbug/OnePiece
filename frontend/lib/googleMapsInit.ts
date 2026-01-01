@@ -30,7 +30,7 @@ export function initializeGoogleMaps(apiKey: string) {
     setOptions({
       apiKey: apiKey,
       version: 'weekly',
-    });
+    } as any);
     (window as any).__googleMapsOptionsSet = true;
     (window as any).__googleMapsApiKey = apiKey;
     console.log('[GoogleMapsInit] ✅ setOptions 호출 완료');
