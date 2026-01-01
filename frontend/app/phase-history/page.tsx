@@ -83,21 +83,67 @@ export default function PhaseHistoryPage() {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // setOptions 먼저 호출
-      console.log('[PhaseHistory] setOptions 호출 중...');
-      initializeGoogleMaps(apiKey);
+      // API 초기화 (전역으로 한 번만 실행 - window 객체에 저장하여 HMR 리셋 방지)
+      const isApiInitialized = typeof window !== 'undefined' ? (window as any).__googleMapsApiInitialized : false;
+      const isApiInitializing = typeof window !== 'undefined' ? (window as any).__googleMapsApiInitializing : false;
+      const savedApiKey = typeof window !== 'undefined' ? (window as any).__googleMapsApiKey : null;
       
-      // setOptions가 적용되도록 대기
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // API 키가 변경되었거나 처음 설정하는 경우
+      if (!isApiInitialized && !isApiInitializing) {
+        if (typeof window !== 'undefined') {
+          (window as any).__googleMapsApiInitializing = true;
+          (window as any).__googleMapsApiKey = apiKey;
+        }
+        
+        // setOptions를 importLibrary 직전에 호출 (매우 중요!)
+        console.log('[PhaseHistory] setOptions 호출 중...');
+        initializeGoogleMaps(apiKey);
+        
+        // setOptions가 완전히 적용되도록 짧은 대기
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Maps 라이브러리 로드
+        console.log('[PhaseHistory] importLibrary("maps") 호출 중...');
+        await importLibrary('maps');
+        console.log('[PhaseHistory] ✅ importLibrary 완료');
+        
+        if (typeof window !== 'undefined') {
+          (window as any).__googleMapsApiInitialized = true;
+          (window as any).__googleMapsApiInitializing = false;
+        }
+      } else if (isApiInitializing) {
+        // 다른 컴포넌트가 초기화 중이면 대기
+        console.log('[PhaseHistory] 다른 컴포넌트가 API를 초기화 중입니다. 대기 중...');
+        while (typeof window !== 'undefined' && (window as any).__googleMapsApiInitializing && !(window as any).__googleMapsApiInitialized) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (typeof window !== 'undefined' && !(window as any).__googleMapsApiInitialized) {
+          throw new Error('API 초기화가 실패했습니다.');
+        }
+        console.log('[PhaseHistory] API 초기화 완료 (다른 컴포넌트에서)');
+      } else if (savedApiKey !== apiKey) {
+        // API 키가 변경된 경우 경고 및 재초기화
+        console.warn('[PhaseHistory] API 키가 변경되었습니다. 재초기화 중...');
+        if (typeof window !== 'undefined') {
+          (window as any).__googleMapsApiInitialized = false;
+          (window as any).__googleMapsApiKey = apiKey;
+        }
+        // setOptions 재호출
+        initializeGoogleMaps(apiKey);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await importLibrary('maps');
+        if (typeof window !== 'undefined') {
+          (window as any).__googleMapsApiInitialized = true;
+        }
+      } else {
+        console.log('[PhaseHistory] API가 이미 초기화되었습니다.');
+      }
 
-      // importLibrary 호출
-      console.log('[PhaseHistory] importLibrary("maps") 호출 중...');
-      await importLibrary('maps');
-      console.log('[PhaseHistory] ✅ importLibrary 완료');
-
-      // google.maps 객체가 로드될 때까지 대기
+      // google.maps 객체가 로드될 때까지 재시도 로직
+      console.log('[PhaseHistory] google.maps 객체 확인 중...');
       let retries = 0;
-      const maxRetries = 20;
+      const maxRetries = 20; // 최대 4초 대기
+      
       while (retries < maxRetries) {
         if (typeof window !== 'undefined' && (window as any).google && (window as any).google.maps && (window as any).google.maps.Map) {
           console.log('[PhaseHistory] ✅ google.maps 객체 확인 완료');
@@ -108,7 +154,7 @@ export default function PhaseHistoryPage() {
       }
 
       if (typeof window === 'undefined' || !(window as any).google || !(window as any).google.maps || !(window as any).google.maps.Map) {
-        throw new Error('Google Maps API가 로드되지 않았습니다.');
+        throw new Error('Google Maps API가 로드되지 않았습니다. API 키를 확인해주세요.');
       }
 
       // 기존 지도가 있으면 제거

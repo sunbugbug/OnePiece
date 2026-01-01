@@ -82,3 +82,8 @@ Desktop.ini
 # Uncomment if you want to track test results
 # !test-results.json
 
+# Documentation files (except README.md)
+*.md
+!README.md
+!**/README.md
+
